@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGIS Sederhana dengan Rute Dinamis</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+    />
+    <style>
+      #map {
+        width: 100%;
+        height: 600px;
+      }
+      #controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: white;
+        padding: 10px;
+        z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls">
+      <h3>Input Titik Awal dan Tujuan</h3>
+      <label for="startLocation">Titik Awal:</label>
+      <input
+        type="text"
+        id="startLocation"
+        placeholder="Masukkan lokasi awal"
+        autocomplete="off"
+      /><br />
+      <label for="endLocation">Titik Tujuan:</label>
+      <input
+        type="text"
+        id="endLocation"
+        placeholder="Masukkan lokasi tujuan"
+        autocomplete="off"
+      /><br />
+      <button id="routeButton">Tampilkan Rute</button>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <script>
+      // Inisialisasi peta Leaflet
+      const map = L.map("map").setView([-6.2, 106.8], 12); // Fokus ke Jakarta
+
+      // Tambahkan tile layer OpenStreetMap
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      // Variabel untuk menyimpan kontrol routing
+      let routingControl;
+
+      // Inisialisasi geocoder
+      const geocoder = L.Control.Geocoder.nominatim();
+
+      // Fungsi untuk menampilkan rute berdasarkan input
+      function showRoute() {
+        const startLocation = document.getElementById("startLocation").value;
+        const endLocation = document.getElementById("endLocation").value;
+
+        // Cek apakah input valid
+        if (!startLocation || !endLocation) {
+          alert("Masukkan lokasi awal dan tujuan.");
+          return;
+        }
+
+        // Geocode lokasi awal
+        geocoder.geocode(startLocation, function (results) {
+          if (results.length === 0) {
+            alert("Lokasi awal tidak ditemukan.");
+            return;
+          }
+          const startPoint = results[0].center;
+
+          // Geocode lokasi tujuan
+          geocoder.geocode(endLocation, function (results) {
+            if (results.length === 0) {
+              alert("Lokasi tujuan tidak ditemukan.");
+              return;
+            }
+            const endPoint = results[0].center;
+
+            // Inisialisasi kontrol routing jika belum ada
+            if (!routingControl) {
+              routingControl = L.Routing.control({
+                waypoints: [
+                  L.latLng(startPoint.lat, startPoint.lng),
+                  L.latLng(endPoint.lat, endPoint.lng),
+                ],
+                routeWhileDragging: true,
+                createMarker: function () {
+                  return null; // Nonaktifkan marker default
+                },
+              }).addTo(map);
+            } else {
+              // Update waypoints jika kontrol routing sudah ada
+              routingControl.setWaypoints([
+                L.latLng(startPoint.lat, startPoint.lng),
+                L.latLng(endPoint.lat, endPoint.lng),
+              ]);
+            }
+
+            // Tambahkan marker untuk titik awal dan tujuan
+            L.marker([startPoint.lat, startPoint.lng])
+              .addTo(map)
+              .bindPopup("Titik Awal: " + startLocation)
+              .openPopup();
+            L.marker([endPoint.lat, endPoint.lng])
+              .addTo(map)
+              .bindPopup("Titik Tujuan: " + endLocation);
+
+            // Pusatkan peta di antara kedua titik
+            map.fitBounds([startPoint, endPoint]);
+          });
+        });
+      }
+
+      // Event listener untuk button
+      document
+        .getElementById("routeButton")
+        .addEventListener("click", showRoute);
+
+      // Fungsi untuk menampilkan saran lokasi saat mengetik
+      function setupAutocomplete(inputId) {
+        const input = document.getElementById(inputId);
+        input.addEventListener("input", function () {
+          if (this.value.length < 3) {
+            return; // Minimal 3 karakter untuk pencarian
+          }
+
+          geocoder.geocode(this.value, function (results) {
+            // Hapus saran sebelumnya
+            const suggestions = document.querySelectorAll(".suggestion");
+            suggestions.forEach((s) => s.remove());
+
+            if (results.length > 0) {
+              results.forEach((result) => {
+                const suggestion = document.createElement("div");
+                suggestion.className = "suggestion";
+                suggestion.innerText = result.label;
+                suggestion.onclick = function () {
+                  input.value = result.label; // Isi input dengan saran yang dipilih
+                  // Hapus saran setelah dipilih
+                  suggestions.forEach((s) => s.remove());
+                };
+                document.getElementById("controls").appendChild(suggestion);
+              });
+            }
+          });
+        });
+      }
+
+      setupAutocomplete("startLocation");
+      setupAutocomplete("endLocation");
+    </script>
+
+    <style>
+      .suggestion {
+        background-color: white;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        margin-top: 2px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1000;
+        width: 200px;
+      }
+    </style>
+  </body>
+</html>
